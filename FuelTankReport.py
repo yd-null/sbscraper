@@ -53,7 +53,7 @@ async def run(site_ids):
             
             # Check for "No Tank" message
             content = await page.content()
-            suffix = "- __No Tank__" if "No Tank details available" in content else ""
+            suffix = " - __No Tank__" if "No Tank details available" in content else ""
             pdf_filename = f"Tank Report - {site_name}{suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
             
