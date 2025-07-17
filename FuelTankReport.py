@@ -17,6 +17,9 @@ with open("config.json", "r") as f:
 USERNAME = config["username"]
 PASSWORD = config["password"]
 
+RED = "\033[91m"
+RESET = "\033[0m"
+
 async def run(site_ids):
 
     os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
@@ -30,7 +33,6 @@ async def run(site_ids):
         print("\nLoading login page...")
         await page.goto(LOGIN_URL)
 
-        # Fill in login form — update selectors accordinglyi
         print("Submitting login form...")
         await page.fill('input[name="UserName"]', USERNAME)
         await page.fill('input[name="Password"]', PASSWORD)
@@ -39,30 +41,30 @@ async def run(site_ids):
         await page.wait_for_load_state('networkidle')
         print("Login successful.\n")
 
-        # Step 2: Loop through siteIDs
         for site_id in site_ids:
             url = f"{TARGET_URL}{site_id}"
             print(f"Fetching: {url}")
             await page.goto(url)
             await page.wait_for_load_state('networkidle')
 
-            # Extract name from <tbody>
             element = await page.query_selector("tbody tr:nth-of-type(1) td:nth-of-type(2)")
-            site_name = await element.inner_text() if element else f"site_{site_id}"
+            site_name = await element.inner_text() if element else ""
             site_name = re.sub(r"[^\w\- ]", "_", site_name).strip()
+
+            if not site_name:
+                print(f"{RED}Warning: Site ID {site_id} may not exist or has no valid name. Skipping...{RESET}")
+                continue
             
-            # Check for "No Tank" message
             content = await page.content()
             suffix = " - __No Tank__" if "No Tank details available" in content else ""
             pdf_filename = f"Tank Report - {site_name}{suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
             
-            # Save PDF
             await page.pdf(path=pdf_path, format="A4", print_background=True)
             print(f"Saved: {pdf_path}")
 
         await browser.close()
-        print("\nAll reports processed and saved successfully.")
+        print("\nAll reports processed and saved successfully.\n")
 
 
 if __name__ == "__main__":
