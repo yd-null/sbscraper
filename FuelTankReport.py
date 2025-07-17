@@ -27,7 +27,7 @@ async def run(site_ids):
         page = await context.new_page()
 
         # Go to login page
-        print("Loading login page...")
+        print("\nLoading login page...")
         await page.goto(LOGIN_URL)
 
         # Fill in login form — update selectors accordinglyi
@@ -37,7 +37,7 @@ async def run(site_ids):
         await page.click('input[type="submit"]')
 
         await page.wait_for_load_state('networkidle')
-        print("Login successful.")
+        print("Login successful.\n")
 
         # Step 2: Loop through siteIDs
         for site_id in site_ids:
@@ -53,8 +53,8 @@ async def run(site_ids):
             
             # Check for "No Tank" message
             content = await page.content()
-            suffix = " - No Tank" if "No Tank details available" in content else ""
-            pdf_filename = f"{site_name}{suffix}.pdf"
+            suffix = "- __No Tank__" if "No Tank details available" in content else ""
+            pdf_filename = f"Tank Report - {site_name}{suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
             
             # Save PDF
