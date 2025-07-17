@@ -61,27 +61,9 @@ async def run(site_ids):
             await page.pdf(path=pdf_path, format="A4", print_background=True)
             print(f"Saved: {pdf_path}")
 
-        content = await page.content()
+        await browser.close()
+        print("\nAll reports processed and saved successfully.")
 
-
-
-        # # Get content of the second row, first cell of the first tbody
-        # element = await page.query_selector("tbody tr:nth-of-type(1) td:nth-of-type(2)")
-        # site_name = await element.inner_text() if element else f"site_{site_id}"
-        #
-        # # Clean it up for safe filenames
-        # safe_site_name = re.sub(r'[^\w\- ]', '_', site_name).strip()
-        #
-        # # Check for "No Tank" message
-        # has_no_tank = "No Tank details available" in await page.content()
-        # suffix = " -- No Tank --" if has_no_tank else ""
-        #
-        # # Final PDF filename
-        # pdf_path = f"{PDF_OUTPUT_DIR}/{safe_site_name}{suffix}.pdf"
-        # await page.pdf(path=pdf_path, format="A4", print_background=True)
-        # print(f"Saved: {pdf_path}")
-        #
-        # await browser.close()
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
