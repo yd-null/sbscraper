@@ -41,6 +41,8 @@ async def run(site_ids):
         await page.wait_for_load_state('networkidle')
         print("Login successful.\n")
 
+        i = 0
+
         for site_id in site_ids:
             url = f"{TARGET_URL}{site_id}"
             print(f"Fetching: {url}")
@@ -63,13 +65,22 @@ async def run(site_ids):
             await page.pdf(path=pdf_path, format="A4", print_background=True)
             print(f"Saved: {pdf_path}")
 
+            i += 1
+
         await browser.close()
-        print("\nAll reports processed and saved successfully.\n")
+
+        if i == 0:
+            print("\nNo reports to process and save.\n")
+        elif i == 1:
+            print(f"\n{i} report processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n")
+        else:    
+            print(f"\n{i} reports processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n")
+
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python scriptname.py 10 20 30 40")
+        print("Usage: python scriptname.py 10 20 30 40  # Numbers are Site IDs")
         sys.exit(1)
 
     # Skip the first argv (script name) and convert to strings
