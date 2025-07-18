@@ -58,8 +58,8 @@ async def run(site_ids):
                 continue
             
             content = await page.content()
-            suffix = " - __No Tank__" if "No Tank details available" in content else ""
-            pdf_filename = f"Tank Report - {site_name}{suffix}.pdf"
+            suffix = "__No Tank__" if "No Tank details available" in content else ""
+            pdf_filename = f"Tank Report - {site_name} {suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
             
             await page.pdf(path=pdf_path, format="A4", print_background=True)
