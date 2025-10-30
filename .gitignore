@@ -5,10 +5,12 @@ build/
 dist/
 wheels/
 *.egg-info
+.DS_STORE
+.python-version
 
 # Virtual environments
 .venv
 
 #
-outputs/
+output/
 config.json
