@@ -1,5 +1,49 @@
 import argparse
 import asyncio
+import json
+import os
+import sys
+
+
+CONFIG_FILE = "config.json"
+DUMMY_USERNAME = "your_username"
+DUMMY_PASSWORD = "your_password"
+
+
+def ensure_config_ready() -> bool:
+    config_path = os.path.join(os.getcwd(), CONFIG_FILE)
+
+    if not os.path.isfile(config_path):
+        dummy_config = {
+            "username": DUMMY_USERNAME,
+            "password": DUMMY_PASSWORD,
+        }
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(dummy_config, f, indent=2)
+            f.write("\n")
+
+        print(f"Created {config_path} with placeholder credentials.")
+        print("Please update username/password in config.json and run again.")
+        return False
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except json.JSONDecodeError:
+        print(f"Invalid JSON in {config_path}. Please fix the file and run again.")
+        return False
+
+    username = str(config.get("username", ""))
+    password = str(config.get("password", ""))
+
+    if username == DUMMY_USERNAME or password == DUMMY_PASSWORD:
+        print(
+            f"{config_path} still has placeholder credentials. "
+            "Please update username/password and run again."
+        )
+        return False
+
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,6 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    if not ensure_config_ready():
+        sys.exit(1)
+
     parser = build_parser()
     args = parser.parse_args()
 
