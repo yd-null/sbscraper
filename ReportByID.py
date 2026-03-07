@@ -13,8 +13,28 @@ SEARCH_URL = "https://sb.ventia.com.au/Search/Search"
 TARGET_URL = "https://sb.ventia.com.au/HierarchyBuilder/LoadHierarchy?OrgCode=ORG01&SiteCode=SITE001&ClientCode=TELSTRA&SystemId=MAIN001&StructureCode="
 PDF_OUTPUT_DIR = "output"
 
-with open("config.json", "r") as f:
-    config = json.load(f)
+
+def _load_config() -> dict:
+    exe_dir = (
+        os.path.dirname(sys.executable)
+        if getattr(sys, "frozen", False)
+        else os.path.dirname(os.path.abspath(__file__))
+    )
+    config_candidates = [
+        os.path.join(os.getcwd(), "config.json"),
+        os.path.join(exe_dir, "config.json"),
+    ]
+
+    for config_path in config_candidates:
+        if os.path.isfile(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+    checked = "\n - ".join(config_candidates)
+    raise FileNotFoundError("Could not find config.json. Checked:\n - " + checked)
+
+
+config = _load_config()
 
 USERNAME = config["username"]
 PASSWORD = config["password"]
@@ -22,8 +42,14 @@ PASSWORD = config["password"]
 RED = "\033[91m"
 RESET = "\033[0m"
 
-async def run(target_ids):
 
+def _configure_playwright_env() -> None:
+    if getattr(sys, "frozen", False) and "PLAYWRIGHT_BROWSERS_PATH" not in os.environ:
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+
+
+async def run(target_ids):
+    _configure_playwright_env()
     os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
 
     async with async_playwright() as p:
@@ -40,38 +66,41 @@ async def run(target_ids):
         await page.fill('input[name="Password"]', PASSWORD)
         await page.click('input[type="submit"]')
 
-        await page.wait_for_load_state('networkidle')
+        await page.wait_for_load_state("networkidle")
         print("Login successful.\n")
 
         i = 0
         structure_code_list = []
 
         for target_id in target_ids:
-            
             await page.goto(SEARCH_URL)
 
             print(f"Searching by PWRID {target_id}...", end="", flush=True)
             await page.fill('input[name="StructCode"]', target_id)
             await page.click('button[name="btnSearch"]')
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state("networkidle")
 
             # XPath to find a row that contains a cell with exact target_id
             selector = f'//tbody/tr[td[@role="gridcell" and normalize-space(text())="{target_id}"]]'
             row = await page.query_selector(selector)
-        
+
             if row:
-                first_td = await row.query_selector('td:nth-of-type(1)')
+                first_td = await row.query_selector("td:nth-of-type(1)")
                 if first_td:
                     structure_code = (await first_td.inner_text()).strip()
                     if structure_code:
                         structure_code_list.append(structure_code)
-                        print(f"\rSearching by PWRID {target_id}  --  Found record with Structure Code: {structure_code}")
+                        print(
+                            f"\rSearching by PWRID {target_id}  --  Found record with Structure Code: {structure_code}"
+                        )
                     else:
                         print("First <td> is empty.")
                 else:
                     print("First <td> not found in the row.")
             else:
-                print(f"\rSearching by PWRID {target_id}  --  {RED}No matching record found for {target_id}. Skipping.{RESET}")
+                print(
+                    f"\rSearching by PWRID {target_id}  --  {RED}No matching record found for {target_id}. Skipping.{RESET}"
+                )
 
         print("")
 
@@ -79,37 +108,46 @@ async def run(target_ids):
             url = f"{TARGET_URL}{structure_id}&ExpandLast=False"
             print(f"Fetching: {url}")
             await page.goto(url)
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state("networkidle")
 
-            status = await page.get_attribute('input[name="Status"]', 'value')
+            status = await page.get_attribute('input[name="Status"]', "value")
             status = str(status)
             status = re.sub(r"[^\w\- ]", "_", status).strip()
 
-            client_ref_id = await page.get_attribute('input[name="ClientRef"]', 'value')
+            client_ref_id = await page.get_attribute('input[name="ClientRef"]', "value")
             client_ref_id = str(client_ref_id)
             client_ref_id = re.sub(r"[^\w\- ]", "_", client_ref_id).strip()
 
-            
-        ### SY REPORT ###
+            ### SY REPORT ###
             await page.evaluate("TelstraSystemSYReportClick()")
 
             await page.wait_for_timeout(4000)  # wait for action to complete
 
             async with context.expect_page() as report_page_info:
-                await page.evaluate("PrintReportByName(TelstraSystemSYReportModalWindow, 'TelstraSystemSYReport')")
+                await page.evaluate(
+                    "PrintReportByName(TelstraSystemSYReportModalWindow, 'TelstraSystemSYReport')"
+                )
 
             report_page = await report_page_info.value
-            
-            await report_page.wait_for_load_state('networkidle')
 
-            element = await page.query_selector('//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]')
+            await report_page.wait_for_load_state("networkidle")
+
+            element = await page.query_selector(
+                '//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]'
+            )
             site_name = await element.inner_text() if element else ""
             site_name = re.sub(r"[^\w\- ]", "_", site_name).strip()
-            
-            suffix = "__Decommissioned__" if "DECOMMISSIONED" in status else "__Invalid__" if "INVALID" in status else ""
+
+            suffix = (
+                "__Decommissioned__"
+                if "DECOMMISSIONED" in status
+                else "__Invalid__"
+                if "INVALID" in status
+                else ""
+            )
             pdf_filename = f"SYReport - ({client_ref_id}) {site_name} {suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
-            
+
             await report_page.pdf(path=pdf_path, format="A4", print_background=True)
             print(f"Saved: {pdf_path}")
 
@@ -118,27 +156,34 @@ async def run(target_ids):
             # await page.click('a.k-button.k-bare.k-button-icon.k-window-action[aria-label="Close"]')
             # await page.locator('a.k-window-action[aria-label="Close"]').first().click({ force: true });
 
-
-        ### SYSTEM REPORT ###
+            ### SYSTEM REPORT ###
             await page.evaluate("SystemReportClick()")
 
             await page.wait_for_timeout(4000)  # wait for action to complete
 
             async with context.expect_page() as report_page_info:
-                await page.evaluate("PrintReportByName(SystemInformationReportWindow, 'SystemInformationReport')")
+                await page.evaluate(
+                    "PrintReportByName(SystemInformationReportWindow, 'SystemInformationReport')"
+                )
 
             report_page = await report_page_info.value
-            
-            await report_page.wait_for_load_state('networkidle')
+
+            await report_page.wait_for_load_state("networkidle")
 
             # element = await page.query_selector('//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]')
             # site_name = await element.inner_text() if element else ""
             # site_name = re.sub(r"[^\w\- ]", "_", site_name).strip()
-            
-            suffix = "__Decommissioned__" if "DECOMMISSIONED" in status else "__Invalid__" if "INVALID" in status else ""
+
+            suffix = (
+                "__Decommissioned__"
+                if "DECOMMISSIONED" in status
+                else "__Invalid__"
+                if "INVALID" in status
+                else ""
+            )
             pdf_filename = f"SystemReport - ({client_ref_id}) {site_name} {suffix}.pdf"
             pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
-            
+
             await report_page.pdf(path=pdf_path, format="A4", print_background=True)
             print(f"Saved: {pdf_path}")
 
@@ -155,10 +200,13 @@ async def run(target_ids):
         if i == 0:
             print("\nNo reports to process and save.\n")
         elif i == 1:
-            print(f"\n{i} report processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n")
-        else:    
-            print(f"\n{i} reports processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n")
-
+            print(
+                f"\n{i} report processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n"
+            )
+        else:
+            print(
+                f"\n{i} reports processed and saved successfully.\n{os.path.abspath(PDF_OUTPUT_DIR)}\n"
+            )
 
 
 if __name__ == "__main__":
