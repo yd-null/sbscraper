@@ -1,0 +1,46 @@
+name: Build Windows Onefile EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[build]
+
+      - name: Install Playwright Chromium into package
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "0"
+          python -m playwright install chromium
+
+      - name: Build onefile exe
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --name sbscraper --onefile --collect-all playwright --collect-all pdfplumber main.py
+
+      - name: Bundle runtime files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item dist\sbscraper.exe release\sbscraper.exe
+          Copy-Item config.example.json release\config.example.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbscraper-windows-onefile
+          path: release/*
