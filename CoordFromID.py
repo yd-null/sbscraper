@@ -2,8 +2,14 @@ import argparse
 import csv
 import os
 import re
+from pathlib import Path
 
 import pdfplumber
+
+
+def _path_with_uri(path: str) -> str:
+    resolved = Path(path).resolve()
+    return f"{resolved} ({resolved.as_uri()})"
 
 
 def run(pdf_folder: str, output_csv: str = "sites.csv") -> None:
@@ -51,7 +57,7 @@ def run(pdf_folder: str, output_csv: str = "sites.csv") -> None:
         )
         writer.writerows(rows)
 
-    print(f"Extraction complete: {os.path.abspath(output_csv)}")
+    print(f"Extraction complete: {_path_with_uri(output_csv)}")
 
 
 def build_parser() -> argparse.ArgumentParser:

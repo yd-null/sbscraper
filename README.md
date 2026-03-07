@@ -33,10 +33,12 @@ python main.py -coord <PDF_DIRECTORY> [--output sites.csv]
 
 ## Windows executable
 
-```console
-python main.py -pwrid <PWRID...>
-python main.py -fuel <SITE_ID...>
-python main.py -coord <PDF_DIRECTORY> [--output sites.csv]
+Run from Command Prompt or PowerShell in the folder containing `sbscraper.exe`:
+
+```powershell
+.\sbscraper.exe -pwrid <PWRID...>
+.\sbscraper.exe -fuel <SITE_ID...>
+.\sbscraper.exe -coord <PDF_DIRECTORY> [--output sites.csv]
 ```
 
 ## Output
