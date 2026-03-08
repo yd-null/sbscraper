@@ -1,20 +1,14 @@
 # sbscraper
 
-`sbscraper` is a single CLI for three SBS workflows:
+`sbscraper` is a CLI wrapper for scraping Structure Builder reports:
 
 - `-pwrid`: fetch reports by PWRID
 - `-fuel`: fetch fuel tank reports by Site ID
 - `-coord`: extract address/lat/lon from a folder of PDF reports into CSV
 
-## Requirements
-
-- Python 3.13+
-- Playwright Chromium (installed automatically in CI workflows)
-- `config.json` with SBS credentials
-
 ## Config
 
-Create `config.json` in the working directory (or next to the exe):
+Create `config.json` in the same working directory as the executable:
 
 ```json
 {
