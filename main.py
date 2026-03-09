@@ -1,47 +1,58 @@
 import argparse
 import asyncio
+import getpass
 import json
 import os
 import sys
 
 
 CONFIG_FILE = "config.json"
-DUMMY_USERNAME = "your_username"
-DUMMY_PASSWORD = "your_password"
+
+
+def _prompt_and_write_config(config_path: str) -> bool:
+    try:
+        print("Set up credentials for SBScraper.")
+        username = input("Username: ").strip()
+        password = getpass.getpass("Password: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nCredential setup cancelled.")
+        return False
+
+    if not username or not password:
+        print("Username and password are required.")
+        return False
+
+    config = {
+        "username": username,
+        "password": password,
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+
+    print(f"Saved credentials to {config_path}.")
+    return True
 
 
 def ensure_config_ready() -> bool:
     config_path = os.path.join(os.getcwd(), CONFIG_FILE)
 
     if not os.path.isfile(config_path):
-        dummy_config = {
-            "username": DUMMY_USERNAME,
-            "password": DUMMY_PASSWORD,
-        }
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(dummy_config, f, indent=2)
-            f.write("\n")
-
-        print(f"Created {config_path} with placeholder credentials.")
-        print("Please update username/password in config.json and run again.")
-        return False
+        return _prompt_and_write_config(config_path)
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
     except json.JSONDecodeError:
-        print(f"Invalid JSON in {config_path}. Please fix the file and run again.")
-        return False
+        print(f"Invalid JSON in {config_path}. Recreating it now.")
+        return _prompt_and_write_config(config_path)
 
     username = str(config.get("username", ""))
     password = str(config.get("password", ""))
 
-    if username == DUMMY_USERNAME or password == DUMMY_PASSWORD:
-        print(
-            f"{config_path} still has placeholder credentials. "
-            "Please update username/password and run again."
-        )
-        return False
+    if not username or not password:
+        print(f"{config_path} is missing username/password. Let's update it now.")
+        return _prompt_and_write_config(config_path)
 
     return True
 

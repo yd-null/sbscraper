@@ -35,7 +35,7 @@ jobs:
       - name: Build onefile exe
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --name sbscraper --onefile --collect-all playwright --collect-all pdfplumber main.py
+          pyinstaller --noconfirm --clean --name sbscraper --onefile --collect-data playwright main.py
 
       - name: Prepare release assets
         shell: pwsh
