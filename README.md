@@ -8,7 +8,9 @@
 
 ## Config
 
-Create `config.json` in the same working directory as the executable:
+On first run, `sbscraper` prompts for your username and password, then creates `config.json` automatically in your current working directory (the folder you run `python main.py ...` or `sbscraper.exe ...` from).
+
+You can still create/edit it manually if needed. Template:
 
 ```json
 {
@@ -16,6 +18,8 @@ Create `config.json` in the same working directory as the executable:
   "password": "your_password"
 }
 ```
+
+If credentials are missing or `config.json` is invalid JSON, the app prompts again and rewrites the file.
 
 ## CLI usage
 

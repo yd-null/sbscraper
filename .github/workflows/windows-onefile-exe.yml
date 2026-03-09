@@ -1,4 +1,4 @@
-name: Build Windows Onefile EXE
+name: Build Windows Onedir EXE
 
 on:
   workflow_dispatch:
@@ -27,20 +27,19 @@ jobs:
           $env:PLAYWRIGHT_BROWSERS_PATH = "0"
           python -m playwright install chromium
 
-      - name: Build onefile exe
+      - name: Build onedir app
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --name sbscraper --onefile --collect-data playwright main.py
+          pyinstaller --noconfirm --clean --name sbscraper --collect-data playwright main.py
 
       - name: Bundle runtime files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item dist\sbscraper.exe release\sbscraper.exe
-          Copy-Item config.example.json release\config.example.json
+          Copy-Item -Recurse dist\sbscraper release\sbscraper
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbscraper-windows-onefile
+          name: sbscraper-windows-onedir
           path: release/*

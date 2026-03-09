@@ -1,4 +1,4 @@
-# Windows onefile deploy
+# Windows deploy
 
 You do not need Python on target Windows systems.
 
@@ -6,27 +6,25 @@ You do not need Python on target Windows systems.
 
 Use the GitHub Actions workflow at `.github/workflows/windows-onefile-exe.yml`.
 
-- Trigger manually from **Actions -> Build Windows Onefile EXE -> Run workflow**.
+- Trigger manually from **Actions -> Build Windows Onedir EXE -> Run workflow**.
 
-The workflow produces an artifact named `sbscraper-windows-onefile` with:
+The workflow produces an artifact named `sbscraper-windows-onedir` with:
 
-- `sbscraper.exe`
-- `config.example.json`
+- `sbscraper/` (contains `sbscraper.exe` and runtime files)
 
 ## Auto-release on tags
 
 Push a tag like `v1.0.0` to trigger `.github/workflows/windows-release.yml`.
 
-That workflow builds `sbscraper.exe` and publishes a GitHub Release with:
+That workflow builds a Windows app folder and publishes a GitHub Release with:
 
-- `sbscraper.exe`
-- `config.example.json`
+- `sbscraper-windows.zip`
 
 ## Deploy on Windows machines
 
-1. Copy `sbscraper.exe` to the target machine.
-2. Copy `config.example.json` beside it and rename to `config.json`.
-3. Fill in credentials in `config.json`.
+1. Extract `sbscraper-windows.zip` (or download the `sbscraper-windows-onedir` artifact).
+2. Run `sbscraper.exe` from inside the `sbscraper` folder.
+3. On first run, the app prompts for credentials and creates `config.json` automatically.
 
 ## Run examples
 
