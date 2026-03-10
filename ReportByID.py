@@ -64,6 +64,18 @@ def _sanitize(value: str | None) -> str:
     return re.sub(r"[^\w\- ]", "_", str(value or "")).strip()
 
 
+async def _get_login_failure_message(page) -> str | None:
+    failure_cell = page.locator("td.login-failure").first
+    if not await failure_cell.is_visible():
+        return None
+
+    message = (await failure_cell.inner_text()).strip()
+    if message:
+        return message
+
+    return "Login failed! Please check your username and password."
+
+
 def _is_pdf_blank(pdf_path: str) -> bool:
     with pdfplumber.open(pdf_path) as pdf:
         if not pdf.pages:
@@ -235,7 +247,7 @@ async def _save_pdf_if_report_ready(
         print(
             f"{RED}Warning: Could not validate PDF content ({pdf_path}): {exc}{RESET}"
         )
-        print(f"Saved: {_path_with_uri(pdf_path)}")
+        print(f"Saved: {Path(pdf_path).name}")
         return True
 
     if is_blank_pdf:
@@ -246,7 +258,7 @@ async def _save_pdf_if_report_ready(
         _remove_file_if_exists(pdf_path)
         return False
 
-    print(f"Saved: {_path_with_uri(pdf_path)}")
+    print(f"Saved: {Path(pdf_path).name}")
     return True
 
 
@@ -267,6 +279,13 @@ async def run(target_ids):
         await page.fill('input[name="UserName"]', USERNAME)
         await page.fill('input[name="Password"]', PASSWORD)
         await page.click('input[type="submit"]')
+
+        await page.wait_for_load_state("domcontentloaded")
+        failure_message = await _get_login_failure_message(page)
+        if failure_message:
+            print(f"{RED}{failure_message}{RESET}")
+            await browser.close()
+            raise SystemExit(1)
 
         await page.wait_for_load_state("networkidle")
         print("Login successful.\n")
