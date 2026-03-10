@@ -165,9 +165,7 @@ async def _save_pdf_if_report_ready(
 ) -> bool:
     is_ready, reason = await _wait_until_report_ready(page)
     if not is_ready:
-        failed_saves.append(
-            f"Tank report | {context_label} | {reason} | {_path_with_uri(pdf_path)}"
-        )
+        failed_saves.append(f"Tank report | {context_label} | {reason}")
         print(
             f"{RED}Skipping save: Tank report still blank after wait+reload. "
             f"{context_label}{RESET}"
@@ -187,11 +185,10 @@ async def _save_pdf_if_report_ready(
 
     if is_blank_pdf:
         failed_saves.append(
-            f"Tank report | {context_label} | saved file still blank | {_path_with_uri(pdf_path)}"
+            f"Tank report | {context_label} | saved file was blank and removed"
         )
         _warn_if_blank_pdf(pdf_path)
         _remove_file_if_exists(pdf_path)
-        print(f"{RED}Removed blank PDF after save: {_path_with_uri(pdf_path)}{RESET}")
         return False
 
     print(f"Saved: {_path_with_uri(pdf_path)}")

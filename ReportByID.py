@@ -46,7 +46,8 @@ ORANGE = "\033[33m"
 RESET = "\033[0m"
 PAGE_RECHECK_DELAY_MS = 7000
 PAGE_RELOAD_DELAY_MS = 3000
-MIN_PAGE_TEXT_LENGTH = 120
+PARENT_READY_TIMEOUT_MS = 20000
+PARENT_READY_POLL_MS = 500
 
 
 def _configure_playwright_env() -> None:
@@ -57,6 +58,10 @@ def _configure_playwright_env() -> None:
 def _path_with_uri(path: str) -> str:
     resolved = Path(path).resolve()
     return resolved.as_uri()
+
+
+def _sanitize(value: str | None) -> str:
+    return re.sub(r"[^\w\- ]", "_", str(value or "")).strip()
 
 
 def _is_pdf_blank(pdf_path: str) -> bool:
@@ -109,8 +114,6 @@ async def _page_has_report_content(report_page) -> tuple[bool, str]:
         return False, f"could not read page content ({exc})"
 
     normalized = " ".join(str(body_text).split()).strip()
-    if len(normalized) < MIN_PAGE_TEXT_LENGTH:
-        return False, "page content too short"
 
     lowered = normalized.lower()
     has_login_markers = (
@@ -127,7 +130,52 @@ async def _page_has_report_content(report_page) -> tuple[bool, str]:
     if has_error_markers:
         return False, "report window shows an error/access page"
 
-    return True, ""
+    if normalized:
+        return True, ""
+
+    iframe_count = await report_page.locator("iframe").count()
+    if iframe_count > 0:
+        return True, ""
+
+    if await report_page.locator("object").count() > 0:
+        return True, ""
+
+    if await report_page.locator("embed").count() > 0:
+        return True, ""
+
+    return False, "page content empty"
+
+
+async def _wait_until_parent_page_ready(page) -> tuple[bool, str, str, str]:
+    await page.wait_for_load_state("domcontentloaded")
+
+    attempts = max(1, PARENT_READY_TIMEOUT_MS // PARENT_READY_POLL_MS)
+    last_reason = "required fields/functions not ready"
+
+    for _ in range(attempts):
+        status = await page.get_attribute('input[name="Status"]', "value")
+        client_ref_id = await page.get_attribute('input[name="ClientRef"]', "value")
+        js_ready = await page.evaluate(
+            "() => typeof TelstraSystemSYReportClick === 'function'"
+            " && typeof SystemReportClick === 'function'"
+            " && typeof PrintReportByName === 'function'"
+        )
+
+        missing = []
+        if status is None:
+            missing.append("Status")
+        if client_ref_id is None:
+            missing.append("ClientRef")
+        if not js_ready:
+            missing.append("report javascript")
+
+        if not missing:
+            return True, _sanitize(status), _sanitize(client_ref_id), ""
+
+        last_reason = "missing " + ", ".join(missing)
+        await page.wait_for_timeout(PARENT_READY_POLL_MS)
+
+    return False, "", "", last_reason
 
 
 async def _wait_until_report_ready(report_page, report_name: str) -> tuple[bool, str]:
@@ -172,9 +220,7 @@ async def _save_pdf_if_report_ready(
 ) -> bool:
     is_ready, reason = await _wait_until_report_ready(report_page, report_name)
     if not is_ready:
-        failed_saves.append(
-            f"{report_name} | {context_label} | {reason} | {_path_with_uri(pdf_path)}"
-        )
+        failed_saves.append(f"{report_name} | {context_label} | {reason}")
         print(
             f"{RED}Skipping save: {report_name} still blank after wait+reload. "
             f"{context_label}{RESET}"
@@ -194,11 +240,10 @@ async def _save_pdf_if_report_ready(
 
     if is_blank_pdf:
         failed_saves.append(
-            f"{report_name} | {context_label} | saved file still blank | {_path_with_uri(pdf_path)}"
+            f"{report_name} | {context_label} | saved file was blank and removed"
         )
         _warn_if_blank_pdf(pdf_path, report_name)
         _remove_file_if_exists(pdf_path)
-        print(f"{RED}Removed blank PDF after save: {_path_with_uri(pdf_path)}{RESET}")
         return False
 
     print(f"Saved: {_path_with_uri(pdf_path)}")
@@ -266,15 +311,24 @@ async def run(target_ids):
             url = f"{TARGET_URL}{structure_id}&ExpandLast=False"
             print(f"Fetching PWRID {ORANGE}{target_id}{RESET}: {url}")
             await page.goto(url)
-            await page.wait_for_load_state("networkidle")
-
-            status = await page.get_attribute('input[name="Status"]', "value")
-            status = str(status)
-            status = re.sub(r"[^\w\- ]", "_", status).strip()
-
-            client_ref_id = await page.get_attribute('input[name="ClientRef"]', "value")
-            client_ref_id = str(client_ref_id)
-            client_ref_id = re.sub(r"[^\w\- ]", "_", client_ref_id).strip()
+            (
+                parent_ready,
+                status,
+                client_ref_id,
+                parent_reason,
+            ) = await _wait_until_parent_page_ready(page)
+            if not parent_ready:
+                print(
+                    f"{RED}Skipping PWRID {target_id}: parent page not ready ({parent_reason}).{RESET}"
+                )
+                failed_saves.append(
+                    f"SY report | PWRID {target_id} | parent page not ready ({parent_reason})"
+                )
+                failed_saves.append(
+                    f"System report | PWRID {target_id} | parent page not ready ({parent_reason})"
+                )
+                print("")
+                continue
 
             ### SY REPORT ###
             await page.evaluate("TelstraSystemSYReportClick()")
@@ -310,7 +364,7 @@ async def run(target_ids):
                 report_page=report_page,
                 pdf_path=pdf_path,
                 report_name="SY report",
-                context_label=f"PWRID {client_ref_id}",
+                context_label=f"PWRID {target_id}",
                 failed_saves=failed_saves,
             )
             if sy_saved:
@@ -353,7 +407,7 @@ async def run(target_ids):
                 report_page=report_page,
                 pdf_path=pdf_path,
                 report_name="System report",
-                context_label=f"PWRID {client_ref_id}",
+                context_label=f"PWRID {target_id}",
                 failed_saves=failed_saves,
             )
             if system_saved:
