@@ -9,7 +9,7 @@ import pdfplumber
 
 def _path_with_uri(path: str) -> str:
     resolved = Path(path).resolve()
-    return f"{resolved} ({resolved.as_uri()})"
+    return resolved.as_uri()
 
 
 def run(pdf_folder: str, output_csv: str = "sites.csv") -> None:
@@ -20,6 +20,8 @@ def run(pdf_folder: str, output_csv: str = "sites.csv") -> None:
 
     for file in os.listdir(pdf_folder):
         if not file.lower().endswith(".pdf"):
+            continue
+        if not file.startswith("SYReport"):
             continue
 
         path = os.path.join(pdf_folder, file)

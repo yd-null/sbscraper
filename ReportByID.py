@@ -42,6 +42,7 @@ USERNAME = config["username"]
 PASSWORD = config["password"]
 
 RED = "\033[91m"
+ORANGE = "\033[33m"
 RESET = "\033[0m"
 PAGE_RECHECK_DELAY_MS = 7000
 PAGE_RELOAD_DELAY_MS = 3000
@@ -55,7 +56,7 @@ def _configure_playwright_env() -> None:
 
 def _path_with_uri(path: str) -> str:
     resolved = Path(path).resolve()
-    return f"{resolved} ({resolved.as_uri()})"
+    return resolved.as_uri()
 
 
 def _is_pdf_blank(pdf_path: str) -> bool:
@@ -226,7 +227,7 @@ async def run(target_ids):
         print("Login successful.\n")
 
         saved_count = 0
-        structure_code_list = []
+        structure_targets = []
         failed_saves: list[str] = []
 
         for target_id in target_ids:
@@ -246,7 +247,7 @@ async def run(target_ids):
                 if first_td:
                     structure_code = (await first_td.inner_text()).strip()
                     if structure_code:
-                        structure_code_list.append(structure_code)
+                        structure_targets.append((target_id, structure_code))
                         print(
                             f"\rSearching by PWRID {target_id}  --  Found record with Structure Code: {structure_code}"
                         )
@@ -261,9 +262,9 @@ async def run(target_ids):
 
         print("")
 
-        for structure_id in structure_code_list:
+        for target_id, structure_id in structure_targets:
             url = f"{TARGET_URL}{structure_id}&ExpandLast=False"
-            print(f"Fetching: {url}")
+            print(f"Fetching PWRID {ORANGE}{target_id}{RESET}: {url}")
             await page.goto(url)
             await page.wait_for_load_state("networkidle")
 

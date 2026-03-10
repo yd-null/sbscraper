@@ -53,7 +53,7 @@ def _configure_playwright_env() -> None:
 
 def _path_with_uri(path: str) -> str:
     resolved = Path(path).resolve()
-    return f"{resolved} ({resolved.as_uri()})"
+    return resolved.as_uri()
 
 
 def _is_pdf_blank(pdf_path: str) -> bool:
