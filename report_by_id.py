@@ -234,7 +234,7 @@ async def run(target_ids):
         try:
             await login_to_sb(page, username, password, LOGIN_URL)
         except LoginError as exc:
-            print(f"{RED}{exc}{RESET}")
+            print(exc)
             await browser.close()
             raise SystemExit(1) from exc
 
@@ -300,7 +300,7 @@ async def run(target_ids):
             ### SY REPORT ###
             await page.evaluate("TelstraSystemSYReportClick()")
 
-            await page.wait_for_timeout(4000)  # wait for action to complete
+            await wait_with_spinner("Waiting for SY report action", 4000)
 
             async with context.expect_page() as report_page_info:
                 await page.evaluate(
@@ -345,7 +345,7 @@ async def run(target_ids):
             ### SYSTEM REPORT ###
             await page.evaluate("SystemReportClick()")
 
-            await page.wait_for_timeout(4000)  # wait for action to complete
+            await wait_with_spinner("Waiting for System report action", 4000)
 
             async with context.expect_page() as report_page_info:
                 await page.evaluate(

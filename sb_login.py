@@ -1,6 +1,11 @@
 from sb_ui import run_with_spinner
 
 
+RED = "\033[91m"
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+
 class LoginError(RuntimeError):
     pass
 
@@ -33,9 +38,9 @@ async def login_to_sb(page, username: str, password: str, login_url: str) -> Non
 
     failure_message = await _get_login_failure_message(page)
     if failure_message:
-        raise LoginError(failure_message)
+        raise LoginError(f"{RED}{failure_message}{RESET}")
 
     await run_with_spinner(
         "Finalizing authenticated session", page.wait_for_load_state("networkidle")
     )
-    print("Login successful.\n")
+    print(f"{GREEN}Login successful.{RESET}\n")

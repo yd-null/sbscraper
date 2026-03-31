@@ -180,7 +180,7 @@ async def run(site_ids):
         try:
             await login_to_sb(page, username, password, LOGIN_URL)
         except LoginError as exc:
-            print(f"{RED}{exc}{RESET}")
+            print(exc)
             await browser.close()
             raise SystemExit(1) from exc
 
