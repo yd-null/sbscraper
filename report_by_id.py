@@ -2,44 +2,19 @@ import asyncio
 import sys
 import os
 import re
-import json
 from pathlib import Path
 
 import pdfplumber
 from playwright.async_api import async_playwright
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from sb_config import load_credentials
+from sb_login import LoginError, login_to_sb
+from sb_ui import run_with_spinner, wait_with_spinner
 
 
 LOGIN_URL = "https://sb.ventia.com.au/"
 SEARCH_URL = "https://sb.ventia.com.au/Search/Search"
 TARGET_URL = "https://sb.ventia.com.au/HierarchyBuilder/LoadHierarchy?OrgCode=ORG01&SiteCode=SITE001&ClientCode=TELSTRA&SystemId=MAIN001&StructureCode="
 PDF_OUTPUT_DIR = "output"
-
-
-def _load_config() -> dict:
-    exe_dir = (
-        os.path.dirname(sys.executable)
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
-    config_candidates = [
-        os.path.join(os.getcwd(), "config.json"),
-        os.path.join(exe_dir, "config.json"),
-    ]
-
-    for config_path in config_candidates:
-        if os.path.isfile(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-
-    checked = "\n - ".join(config_candidates)
-    raise FileNotFoundError("Could not find config.json. Checked:\n - " + checked)
-
-
-config = _load_config()
-
-USERNAME = config["username"]
-PASSWORD = config["password"]
 
 RED = "\033[91m"
 ORANGE = "\033[33m"
@@ -62,18 +37,6 @@ def _path_with_uri(path: str) -> str:
 
 def _sanitize(value: str | None) -> str:
     return re.sub(r"[^\w\- ]", "_", str(value or "")).strip()
-
-
-async def _get_login_failure_message(page) -> str | None:
-    failure_cell = page.locator("td.login-failure").first
-    if not await failure_cell.is_visible():
-        return None
-
-    message = (await failure_cell.inner_text()).strip()
-    if message:
-        return message
-
-    return "Login failed! Please check your username and password."
 
 
 def _is_pdf_blank(pdf_path: str) -> bool:
@@ -197,21 +160,17 @@ async def _wait_until_report_ready(report_page, report_name: str) -> tuple[bool,
     if is_ready:
         return True, ""
 
-    print(
-        f"{RED}Warning: {report_name} not ready for PDF ({reason}). "
-        f"Waiting {PAGE_RECHECK_DELAY_MS}ms before retry...{RESET}"
-    )
-    await report_page.wait_for_timeout(PAGE_RECHECK_DELAY_MS)
+    print(f"{RED}Warning: {report_name} not ready for PDF ({reason}).{RESET}")
+    await wait_with_spinner("Waiting before retry", PAGE_RECHECK_DELAY_MS)
     is_ready, reason = await _page_has_report_content(report_page)
     if is_ready:
         return True, ""
 
-    print(
-        f"{RED}Warning: {report_name} still not ready ({reason}). "
-        f"Reloading report window once...{RESET}"
+    print(f"{RED}Warning: {report_name} still not ready ({reason}).{RESET}")
+    await run_with_spinner(
+        "Reloading report window", report_page.reload(wait_until="networkidle")
     )
-    await report_page.reload(wait_until="networkidle")
-    await report_page.wait_for_timeout(PAGE_RELOAD_DELAY_MS)
+    await wait_with_spinner("Allowing report render to settle", PAGE_RELOAD_DELAY_MS)
     return await _page_has_report_content(report_page)
 
 
@@ -265,30 +224,19 @@ async def _save_pdf_if_report_ready(
 async def run(target_ids):
     _configure_playwright_env()
     os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
+    username, password = load_credentials()
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
 
-        # Go to login page
-        print("\nLoading login page...")
-        await page.goto(LOGIN_URL)
-
-        print("Submitting login form...")
-        await page.fill('input[name="UserName"]', USERNAME)
-        await page.fill('input[name="Password"]', PASSWORD)
-        await page.click('input[type="submit"]')
-
-        await page.wait_for_load_state("domcontentloaded")
-        failure_message = await _get_login_failure_message(page)
-        if failure_message:
-            print(f"{RED}{failure_message}{RESET}")
+        try:
+            await login_to_sb(page, username, password, LOGIN_URL)
+        except LoginError as exc:
+            print(f"{RED}{exc}{RESET}")
             await browser.close()
-            raise SystemExit(1)
-
-        await page.wait_for_load_state("networkidle")
-        print("Login successful.\n")
+            raise SystemExit(1) from exc
 
         saved_count = 0
         structure_targets = []

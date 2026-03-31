@@ -8,7 +8,7 @@
 
 ## Config
 
-On first run, `sbscraper` prompts for your username and password, then creates `config.json` automatically in your current working directory (the folder you run `python main.py ...` or `sbscraper.exe ...` from).
+On first run, `sbscraper` prompts for your username and password, then creates `config.json` next to the executing program path (`sys.argv[0]` semantics). For `python main.py ...`, this is next to `main.py`; for `sbscraper.exe ...`, this is next to `sbscraper.exe`.
 
 You can still create/edit it manually if needed. Template:
 

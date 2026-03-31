@@ -24,7 +24,7 @@ That workflow builds a Windows app folder and publishes a GitHub Release with:
 
 1. Extract `sbscraper-windows.zip` (or download the `sbscraper-windows-onedir` artifact).
 2. Run `sbscraper.exe` from inside the `sbscraper` folder.
-3. On first run, the app prompts for credentials and creates `config.json` automatically.
+3. On first run, the app prompts for credentials and creates `config.json` next to `sbscraper.exe` (not in the current working directory).
 
 ## Run examples
 

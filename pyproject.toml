@@ -19,4 +19,4 @@ build = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "ReportByID", "FuelTankReport", "CoordFromID"]
+py-modules = ["main", "report_by_id", "fuel_tank_report", "coord_from_id", "sb_login", "sb_config", "sb_ui"]
