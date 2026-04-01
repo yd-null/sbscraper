@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pdfplumber
 from playwright.async_api import async_playwright
-from sb_config import load_credentials
+from sb_config import get_execution_dir, load_credentials
 from sb_login import LoginError, login_to_sb
 from sb_ui import run_with_spinner, wait_with_spinner
 
@@ -223,7 +223,8 @@ async def _save_pdf_if_report_ready(
 
 async def run(target_ids):
     _configure_playwright_env()
-    os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
+    output_dir = get_execution_dir() / PDF_OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
     username, password = load_credentials()
 
     async with async_playwright() as p:
@@ -325,7 +326,7 @@ async def run(target_ids):
                 else ""
             )
             pdf_filename = f"SYReport - ({client_ref_id}) {site_name} {suffix}.pdf"
-            pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
+            pdf_path = str(output_dir / pdf_filename)
 
             sy_saved = await _save_pdf_if_report_ready(
                 report_page=report_page,
@@ -368,7 +369,7 @@ async def run(target_ids):
                 else ""
             )
             pdf_filename = f"SystemReport - ({client_ref_id}) {site_name} {suffix}.pdf"
-            pdf_path = os.path.join(PDF_OUTPUT_DIR, pdf_filename)
+            pdf_path = str(output_dir / pdf_filename)
 
             system_saved = await _save_pdf_if_report_ready(
                 report_page=report_page,
@@ -392,11 +393,11 @@ async def run(target_ids):
             print("\nNo reports to process and save.\n")
         elif saved_count == 1:
             print(
-                f"\n{saved_count} report saved successfully.\n{_path_with_uri(PDF_OUTPUT_DIR)}\n"
+                f"\n{saved_count} report saved successfully.\n{_path_with_uri(output_dir)}\n"
             )
         else:
             print(
-                f"\n{saved_count} reports saved successfully.\n{_path_with_uri(PDF_OUTPUT_DIR)}\n"
+                f"\n{saved_count} reports saved successfully.\n{_path_with_uri(output_dir)}\n"
             )
 
         if failed_saves:

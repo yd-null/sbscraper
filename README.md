@@ -41,5 +41,5 @@ Run from Command Prompt or PowerShell in the folder containing `sbscraper.exe`:
 
 ## Output
 
-- PDF reports are saved under `output/`
+- PDF reports are saved under `output/` next to the executing program path (`sys.argv[0]` semantics)
 - Coordinate extraction writes CSV to `sites.csv` by default (or `--output` path)
