@@ -3,11 +3,18 @@ import asyncio
 import sys
 
 from sb_config import ensure_config_ready
+from sb_version import get_app_version
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run SBScraper apps from a single entrypoint."
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_app_version()}",
     )
 
     app_group = parser.add_mutually_exclusive_group(required=True)
@@ -42,11 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    if not ensure_config_ready():
-        sys.exit(1)
-
     parser = build_parser()
     args = parser.parse_args()
+
+    if not ensure_config_ready():
+        sys.exit(1)
 
     if args.pwrid:
         if not args.ids:

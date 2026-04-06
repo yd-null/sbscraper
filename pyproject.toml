@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbscraper"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Scrape all the things"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -19,4 +19,8 @@ build = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "report_by_id", "fuel_tank_report", "coord_from_id", "sb_login", "sb_config", "sb_ui"]
+py-modules = ["main", "report_by_id", "fuel_tank_report", "coord_from_id", "sb_login", "sb_config", "sb_ui", "sb_version"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
+local_scheme = "no-local-version"

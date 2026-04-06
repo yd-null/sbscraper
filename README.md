@@ -24,6 +24,8 @@ If credentials are missing or `config.json` is invalid JSON, the app prompts aga
 ## CLI usage
 
 ```bash
+python main.py -v
+python main.py --version
 python main.py -pwrid <PWRID...>
 python main.py -fuel <SITE_ID...>
 python main.py -coord <PDF_DIRECTORY> [--output sites.csv]
