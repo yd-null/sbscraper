@@ -46,6 +46,14 @@ def _sanitize(value: str | None) -> str:
     return re.sub(r"[^\w\- ]", "_", str(value or "")).strip()
 
 
+def _report_suffix(status: str) -> str:
+    if "DECOMMISSIONED" in status:
+        return "__Decommissioned__"
+    if "INVALID" in status:
+        return "__Invalid__"
+    return ""
+
+
 def _is_pdf_blank(pdf_path: str) -> bool:
     with pdfplumber.open(pdf_path) as pdf:
         if not pdf.pages:
@@ -210,6 +218,13 @@ def _remove_file_if_exists(path: str) -> None:
         pass
 
 
+def _build_pdf_filename(
+    report_prefix: str, client_ref_id: str, site_name: str, suffix: str
+) -> str:
+    suffix_part = f" {suffix}" if suffix else ""
+    return f"{report_prefix} - ({client_ref_id}) {site_name}{suffix_part}.pdf"
+
+
 async def _save_pdf_if_report_ready(
     report_page,
     pdf_path: str,
@@ -273,13 +288,17 @@ async def _save_report_with_retries(
     page,
     parent_url: str,
     pdf_path: str,
+    site_name_fallback: str | None,
     report_name: str,
     context_label: str,
     action_js: str,
     print_js: str,
     failed_saves: list[str],
-) -> bool:
+) -> tuple[bool, str, str]:
     last_failure = f"{report_name} | {context_label} | unknown failure"
+    resolved_site_name = ""
+    last_site_name_reason = "site name empty"
+    effective_pdf_path = pdf_path
 
     for attempt in range(1, REPORT_TRIGGER_ATTEMPTS + 1):
         if attempt > 1:
@@ -306,9 +325,31 @@ async def _save_report_with_retries(
                 action_js=action_js,
                 print_js=print_js,
             )
+
+            attempt_site_name, site_name_reason = await _wait_until_site_name_ready(
+                page
+            )
+            if attempt_site_name:
+                resolved_site_name = attempt_site_name
+                last_site_name_reason = ""
+                if site_name_fallback:
+                    effective_pdf_path = pdf_path.replace(
+                        site_name_fallback,
+                        attempt_site_name,
+                    )
+            else:
+                last_site_name_reason = site_name_reason
+                if site_name_fallback and resolved_site_name:
+                    effective_pdf_path = pdf_path.replace(
+                        site_name_fallback,
+                        resolved_site_name,
+                    )
+                else:
+                    effective_pdf_path = pdf_path
+
             saved, failure_reason = await _save_pdf_if_report_ready(
                 report_page=report_page,
-                pdf_path=pdf_path,
+                pdf_path=effective_pdf_path,
                 report_name=report_name,
                 context_label=context_label,
             )
@@ -329,7 +370,7 @@ async def _save_report_with_retries(
                     pass
 
         if saved:
-            return True
+            return True, resolved_site_name, last_site_name_reason
 
         last_failure = failure_reason
         if attempt < REPORT_TRIGGER_ATTEMPTS:
@@ -343,7 +384,7 @@ async def _save_report_with_retries(
         f"{RED}Skipping save: {report_name} failed after "
         f"{REPORT_TRIGGER_ATTEMPTS} trigger attempt(s). {context_label}{RESET}"
     )
-    return False
+    return False, resolved_site_name, last_site_name_reason
 
 
 async def run(target_ids):
@@ -420,29 +461,27 @@ async def run(target_ids):
                 print("")
                 continue
 
-            site_name, site_name_reason = await _wait_until_site_name_ready(page)
-            if not site_name:
-                site_name = f"UnknownSite-{target_id}"
-                print(
-                    f"{ORANGE}Warning: Could not resolve site name for PWRID {target_id} "
-                    f"({site_name_reason}); using {site_name}.{RESET}"
-                )
+            site_name = f"UnknownSite-{target_id}"
+            suffix = _report_suffix(status)
 
-            suffix = (
-                "__Decommissioned__"
-                if "DECOMMISSIONED" in status
-                else "__Invalid__"
-                if "INVALID" in status
-                else ""
+            sy_pdf_filename = _build_pdf_filename(
+                "SYReport",
+                client_ref_id,
+                site_name,
+                suffix,
             )
-            pdf_filename = f"SYReport - ({client_ref_id}) {site_name} {suffix}.pdf"
-            pdf_path = str(output_dir / pdf_filename)
+            sy_pdf_path = str(output_dir / sy_pdf_filename)
 
-            sy_saved = await _save_report_with_retries(
+            (
+                sy_saved,
+                resolved_site_name,
+                site_name_reason,
+            ) = await _save_report_with_retries(
                 context=context,
                 page=page,
                 parent_url=url,
-                pdf_path=pdf_path,
+                pdf_path=sy_pdf_path,
+                site_name_fallback=site_name,
                 report_name="SY report",
                 context_label=f"PWRID {target_id}",
                 action_js="TelstraSystemSYReportClick()",
@@ -455,21 +494,28 @@ async def run(target_ids):
             if sy_saved:
                 saved_count += 1
 
-            suffix = (
-                "__Decommissioned__"
-                if "DECOMMISSIONED" in status
-                else "__Invalid__"
-                if "INVALID" in status
-                else ""
-            )
-            pdf_filename = f"SystemReport - ({client_ref_id}) {site_name} {suffix}.pdf"
-            pdf_path = str(output_dir / pdf_filename)
+            if resolved_site_name:
+                site_name = resolved_site_name
+            else:
+                print(
+                    f"{ORANGE}Warning: Could not resolve site name for PWRID {target_id} "
+                    f"({site_name_reason}); using {site_name}.{RESET}"
+                )
 
-            system_saved = await _save_report_with_retries(
+            system_pdf_filename = _build_pdf_filename(
+                "SystemReport",
+                client_ref_id,
+                site_name,
+                suffix,
+            )
+            system_pdf_path = str(output_dir / system_pdf_filename)
+
+            system_saved, _, _ = await _save_report_with_retries(
                 context=context,
                 page=page,
                 parent_url=url,
-                pdf_path=pdf_path,
+                pdf_path=system_pdf_path,
+                site_name_fallback=None,
                 report_name="System report",
                 context_label=f"PWRID {target_id}",
                 action_js="SystemReportClick()",
