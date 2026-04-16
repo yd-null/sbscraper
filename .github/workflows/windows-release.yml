@@ -16,6 +16,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve app version
+        shell: pwsh
+        run: |
+          $version = ""
+          $refName = "${{ github.ref_name }}"
+          if ($refName -and $refName.StartsWith("v")) {
+            $version = $refName
+          }
+          if (-not $version) {
+            git fetch --tags --force 2>$null
+            $version = (git describe --tags --abbrev=0 2>$null)
+          }
+          if (-not $version) {
+            $version = "0.0.0"
+          }
+          if ($version.StartsWith("v")) {
+            $version = $version.Substring(1)
+          }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -34,8 +54,11 @@ jobs:
 
       - name: Build onedir app
         shell: pwsh
+        env:
+          SBSCRAPER_VERSION: ${{ env.APP_VERSION }}
         run: |
           pyinstaller --noconfirm --clean --name sbscraper --collect-data playwright main.py
+          Set-Content -Path dist\sbscraper\VERSION -Value $env:APP_VERSION -NoNewline
 
       - name: Prepare release assets
         shell: pwsh
