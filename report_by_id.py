@@ -23,8 +23,13 @@ PAGE_RECHECK_DELAY_MS = 7000
 PAGE_RELOAD_DELAY_MS = 3000
 PARENT_READY_TIMEOUT_MS = 20000
 PARENT_READY_POLL_MS = 500
+SITE_NAME_READY_TIMEOUT_MS = 10000
+SITE_NAME_READY_POLL_MS = 500
 REPORT_ACTION_DELAY_MS = 4000
 REPORT_TRIGGER_ATTEMPTS = 2
+SITE_NAME_SELECTOR = (
+    '//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]'
+)
 
 
 def _configure_playwright_env() -> None:
@@ -153,6 +158,27 @@ async def _wait_until_parent_page_ready(page) -> tuple[bool, str, str, str]:
         await page.wait_for_timeout(PARENT_READY_POLL_MS)
 
     return False, "", "", last_reason
+
+
+async def _wait_until_site_name_ready(page) -> tuple[str, str]:
+    attempts = max(1, SITE_NAME_READY_TIMEOUT_MS // SITE_NAME_READY_POLL_MS)
+    last_reason = "site name empty"
+
+    for _ in range(attempts):
+        try:
+            element = await page.query_selector(SITE_NAME_SELECTOR)
+            site_name = _sanitize(await element.inner_text() if element else "")
+        except Exception as exc:
+            site_name = ""
+            last_reason = f"could not read site name ({exc})"
+        else:
+            if site_name:
+                return site_name, ""
+            last_reason = "site name empty"
+
+        await page.wait_for_timeout(SITE_NAME_READY_POLL_MS)
+
+    return "", last_reason
 
 
 async def _wait_until_report_ready(report_page, report_name: str) -> tuple[bool, str]:
@@ -394,11 +420,13 @@ async def run(target_ids):
                 print("")
                 continue
 
-            element = await page.query_selector(
-                '//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]'
-            )
-            site_name = await element.inner_text() if element else ""
-            site_name = re.sub(r"[^\w\- ]", "_", site_name).strip()
+            site_name, site_name_reason = await _wait_until_site_name_ready(page)
+            if not site_name:
+                site_name = f"UnknownSite-{target_id}"
+                print(
+                    f"{ORANGE}Warning: Could not resolve site name for PWRID {target_id} "
+                    f"({site_name_reason}); using {site_name}.{RESET}"
+                )
 
             suffix = (
                 "__Decommissioned__"
