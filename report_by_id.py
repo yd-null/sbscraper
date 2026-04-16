@@ -23,6 +23,8 @@ PAGE_RECHECK_DELAY_MS = 7000
 PAGE_RELOAD_DELAY_MS = 3000
 PARENT_READY_TIMEOUT_MS = 20000
 PARENT_READY_POLL_MS = 500
+REPORT_ACTION_DELAY_MS = 4000
+REPORT_TRIGGER_ATTEMPTS = 2
 
 
 def _configure_playwright_env() -> None:
@@ -187,16 +189,10 @@ async def _save_pdf_if_report_ready(
     pdf_path: str,
     report_name: str,
     context_label: str,
-    failed_saves: list[str],
-) -> bool:
+) -> tuple[bool, str]:
     is_ready, reason = await _wait_until_report_ready(report_page, report_name)
     if not is_ready:
-        failed_saves.append(f"{report_name} | {context_label} | {reason}")
-        print(
-            f"{RED}Skipping save: {report_name} still blank after wait+reload. "
-            f"{context_label}{RESET}"
-        )
-        return False
+        return False, f"{report_name} | {context_label} | {reason}"
 
     await report_page.pdf(path=pdf_path, format="A4", print_background=True)
 
@@ -207,18 +203,110 @@ async def _save_pdf_if_report_ready(
             f"{RED}Warning: Could not validate PDF content ({pdf_path}): {exc}{RESET}"
         )
         print(f"Saved: {Path(pdf_path).name}")
-        return True
+        return True, ""
 
     if is_blank_pdf:
-        failed_saves.append(
-            f"{report_name} | {context_label} | saved file was blank and removed"
-        )
         _warn_if_blank_pdf(pdf_path, report_name)
         _remove_file_if_exists(pdf_path)
-        return False
+        return (
+            False,
+            f"{report_name} | {context_label} | saved file was blank and removed",
+        )
 
     print(f"Saved: {Path(pdf_path).name}")
-    return True
+    return True, ""
+
+
+async def _open_report_page(
+    context, page, report_name: str, action_js: str, print_js: str
+):
+    await page.evaluate(action_js)
+    await wait_with_spinner(f"Waiting for {report_name} action", REPORT_ACTION_DELAY_MS)
+
+    async with context.expect_page() as report_page_info:
+        await page.evaluate(print_js)
+
+    report_page = await report_page_info.value
+    await report_page.wait_for_load_state("networkidle")
+    return report_page
+
+
+async def _save_report_with_retries(
+    context,
+    page,
+    parent_url: str,
+    pdf_path: str,
+    report_name: str,
+    context_label: str,
+    action_js: str,
+    print_js: str,
+    failed_saves: list[str],
+) -> bool:
+    last_failure = f"{report_name} | {context_label} | unknown failure"
+
+    for attempt in range(1, REPORT_TRIGGER_ATTEMPTS + 1):
+        if attempt > 1:
+            await run_with_spinner(
+                f"Refreshing parent page for {report_name} retry",
+                page.goto(parent_url, wait_until="networkidle"),
+            )
+            parent_ready, _, _, parent_reason = await _wait_until_parent_page_ready(
+                page
+            )
+            if not parent_ready:
+                last_failure = (
+                    f"{report_name} | {context_label} | "
+                    f"parent page not ready on retry ({parent_reason})"
+                )
+                continue
+
+        report_page = None
+        try:
+            report_page = await _open_report_page(
+                context=context,
+                page=page,
+                report_name=report_name,
+                action_js=action_js,
+                print_js=print_js,
+            )
+            saved, failure_reason = await _save_pdf_if_report_ready(
+                report_page=report_page,
+                pdf_path=pdf_path,
+                report_name=report_name,
+                context_label=context_label,
+            )
+        except Exception as exc:
+            saved = False
+            failure_reason = (
+                f"{report_name} | {context_label} | report window failed ({exc})"
+            )
+            print(
+                f"{RED}Warning: {report_name} trigger attempt {attempt}/"
+                f"{REPORT_TRIGGER_ATTEMPTS} failed ({exc}).{RESET}"
+            )
+        finally:
+            if report_page is not None:
+                try:
+                    await report_page.close()
+                except Exception:
+                    pass
+
+        if saved:
+            return True
+
+        last_failure = failure_reason
+        if attempt < REPORT_TRIGGER_ATTEMPTS:
+            print(
+                f"{ORANGE}Warning: {report_name} failed on trigger attempt "
+                f"{attempt}/{REPORT_TRIGGER_ATTEMPTS}; retrying from parent page.{RESET}"
+            )
+
+    failed_saves.append(last_failure)
+    print(
+        f"{RED}Skipping save: {report_name} failed after "
+        f"{REPORT_TRIGGER_ATTEMPTS} trigger attempt(s). {context_label}{RESET}"
+    )
+    return False
 
 
 async def run(target_ids):
@@ -298,20 +386,6 @@ async def run(target_ids):
                 print("")
                 continue
 
-            ### SY REPORT ###
-            await page.evaluate("TelstraSystemSYReportClick()")
-
-            await wait_with_spinner("Waiting for SY report action", 4000)
-
-            async with context.expect_page() as report_page_info:
-                await page.evaluate(
-                    "PrintReportByName(TelstraSystemSYReportModalWindow, 'TelstraSystemSYReport')"
-                )
-
-            report_page = await report_page_info.value
-
-            await report_page.wait_for_load_state("networkidle")
-
             element = await page.query_selector(
                 '//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]'
             )
@@ -328,38 +402,22 @@ async def run(target_ids):
             pdf_filename = f"SYReport - ({client_ref_id}) {site_name} {suffix}.pdf"
             pdf_path = str(output_dir / pdf_filename)
 
-            sy_saved = await _save_pdf_if_report_ready(
-                report_page=report_page,
+            sy_saved = await _save_report_with_retries(
+                context=context,
+                page=page,
+                parent_url=url,
                 pdf_path=pdf_path,
                 report_name="SY report",
                 context_label=f"PWRID {target_id}",
+                action_js="TelstraSystemSYReportClick()",
+                print_js=(
+                    "PrintReportByName(TelstraSystemSYReportModalWindow, "
+                    "'TelstraSystemSYReport')"
+                ),
                 failed_saves=failed_saves,
             )
             if sy_saved:
                 saved_count += 1
-
-            await report_page.close()
-
-            # await page.click('a.k-button.k-bare.k-button-icon.k-window-action[aria-label="Close"]')
-            # await page.locator('a.k-window-action[aria-label="Close"]').first().click({ force: true });
-
-            ### SYSTEM REPORT ###
-            await page.evaluate("SystemReportClick()")
-
-            await wait_with_spinner("Waiting for System report action", 4000)
-
-            async with context.expect_page() as report_page_info:
-                await page.evaluate(
-                    "PrintReportByName(SystemInformationReportWindow, 'SystemInformationReport')"
-                )
-
-            report_page = await report_page_info.value
-
-            await report_page.wait_for_load_state("networkidle")
-
-            # element = await page.query_selector('//table[@id="tblReport"]/tbody[2]/tr[1]/td[1]/table/tbody[1]/tr[1]/td[1]')
-            # site_name = await element.inner_text() if element else ""
-            # site_name = re.sub(r"[^\w\- ]", "_", site_name).strip()
 
             suffix = (
                 "__Decommissioned__"
@@ -371,19 +429,22 @@ async def run(target_ids):
             pdf_filename = f"SystemReport - ({client_ref_id}) {site_name} {suffix}.pdf"
             pdf_path = str(output_dir / pdf_filename)
 
-            system_saved = await _save_pdf_if_report_ready(
-                report_page=report_page,
+            system_saved = await _save_report_with_retries(
+                context=context,
+                page=page,
+                parent_url=url,
                 pdf_path=pdf_path,
                 report_name="System report",
                 context_label=f"PWRID {target_id}",
+                action_js="SystemReportClick()",
+                print_js=(
+                    "PrintReportByName(SystemInformationReportWindow, "
+                    "'SystemInformationReport')"
+                ),
                 failed_saves=failed_saves,
             )
             if system_saved:
                 saved_count += 1
-
-            await report_page.close()
-
-            # await page.click('a.k-button.k-bare.k-button-icon.k-window-action[aria-label="Close"]')
 
             print("")
 
