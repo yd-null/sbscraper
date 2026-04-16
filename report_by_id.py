@@ -231,6 +231,17 @@ async def _open_report_page(
     return report_page
 
 
+async def _search_row_by_pwrid(page, target_id: str):
+    await page.fill('input[name="StructCode"]', target_id)
+    await page.click('button[name="btnSearch"]')
+    await page.wait_for_load_state("networkidle")
+
+    selector = (
+        f'//tbody/tr[td[@role="gridcell" and normalize-space(text())="{target_id}"]]'
+    )
+    return await page.query_selector(selector)
+
+
 async def _save_report_with_retries(
     context,
     page,
@@ -334,14 +345,11 @@ async def run(target_ids):
         for target_id in target_ids:
             await page.goto(SEARCH_URL)
 
-            print(f"Searching by PWRID {target_id}...", end="", flush=True)
-            await page.fill('input[name="StructCode"]', target_id)
-            await page.click('button[name="btnSearch"]')
-            await page.wait_for_load_state("networkidle")
-
-            # XPath to find a row that contains a cell with exact target_id
-            selector = f'//tbody/tr[td[@role="gridcell" and normalize-space(text())="{target_id}"]]'
-            row = await page.query_selector(selector)
+            row = await run_with_spinner(
+                f"Searching by PWRID {target_id}",
+                _search_row_by_pwrid(page, target_id),
+                success_status=None,
+            )
 
             if row:
                 first_td = await row.query_selector("td:nth-of-type(1)")
