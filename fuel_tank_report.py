@@ -144,7 +144,7 @@ async def _save_pdf_if_report_ready(
         )
         return False
 
-    await page.pdf(path=pdf_path, format="A4", print_background=True)
+    await page.pdf(path=pdf_path, format="A4", landscape=True, print_background=True)
 
     try:
         is_blank_pdf = _is_pdf_blank(pdf_path)
