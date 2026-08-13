@@ -62,7 +62,7 @@ BATTERY_STATUS_PATTERN = r"ONLINE|OFFLINE|ACTIVE|INACTIVE|OPERATING|INVALID|DECO
 SYSTEM_REPORT_PDF_STYLE = """
 @page {
   size: A4 landscape;
-  margin: 5mm;
+  margin: 1mm;
 }
 
 html,
@@ -73,8 +73,27 @@ td,
 th,
 div,
 span {
-  font-size: 7px !important;
-  line-height: 1.05 !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+}
+
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+table,
+tbody,
+tr,
+td,
+th {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+table {
+  margin-top: 0 !important;
 }
 
 td,
