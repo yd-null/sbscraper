@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import getpass
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -27,8 +29,29 @@ def get_execution_dir() -> Path:
     return program if program.is_dir() else program.parent
 
 
+def get_config_dir() -> Path:
+    if sys.platform == "win32":
+        base_dir = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        base_dir = Path.home() / "Library" / "Application Support"
+    else:
+        base_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+    return base_dir / "sbscraper"
+
+
 def get_config_path() -> Path:
-    return get_execution_dir() / CONFIG_FILE
+    return get_config_dir() / CONFIG_FILE
+
+
+def _migrate_legacy_config(config_path: Path) -> None:
+    legacy_path = get_execution_dir() / CONFIG_FILE
+    if config_path.exists() or not legacy_path.is_file() or legacy_path == config_path:
+        return
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(legacy_path, config_path)
+    print(f"Migrated credentials to {config_path}.")
 
 
 def _prompt_and_write_config(config_path: Path) -> bool:
@@ -44,6 +67,7 @@ def _prompt_and_write_config(config_path: Path) -> bool:
         print("Username and password are required.")
         return False
 
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as f:
         json.dump({"username": username, "password": password}, f, indent=2)
         f.write("\n")
@@ -68,6 +92,7 @@ def load_credentials() -> tuple[str, str]:
 
 def ensure_config_ready() -> bool:
     config_path = get_config_path()
+    _migrate_legacy_config(config_path)
 
     if not config_path.is_file():
         return _prompt_and_write_config(config_path)

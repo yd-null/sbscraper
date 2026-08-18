@@ -27,7 +27,7 @@ Notes:
   - --output is optional and can be placed before or after the ID list.
   - Battery CSV defaults to battery_report.csv when --output is omitted.
   - Coordinate CSV defaults to sites.csv when --output is omitted.
-  - PDF reports are saved under the output folder next to the program.
+  - PDF reports are saved under the output folder in the current directory.
 """,
     )
     parser.add_argument(
@@ -79,9 +79,6 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    if not ensure_config_ready():
-        sys.exit(1)
-
     pwrid_mode = args.pwrid or args.battery
     selected_mode_count = sum(
         bool(mode) for mode in (pwrid_mode, args.fuel, args.coord)
@@ -90,11 +87,17 @@ def main() -> None:
         parser.error("You must choose one app flag.")
     if selected_mode_count > 1:
         parser.error("-fuel and -coord cannot be combined with -pwrid or -battery.")
+    if pwrid_mode and not args.ids:
+        parser.error("-pwrid/-battery requires one or more PWRIDs.")
+    if args.fuel and not args.ids:
+        parser.error("-fuel requires one or more IDs.")
+    if args.coord and len(args.ids) != 1:
+        parser.error("-coord requires exactly one directory path.")
+
+    if not ensure_config_ready():
+        sys.exit(1)
 
     if args.pwrid and args.battery:
-        if not args.ids:
-            parser.error("-pwrid/-battery requires one or more PWRIDs.")
-
         from report_by_id import run_reports_and_battery_csv
 
         asyncio.run(
@@ -103,36 +106,24 @@ def main() -> None:
         return
 
     if args.pwrid:
-        if not args.ids:
-            parser.error("-pwrid requires one or more IDs.")
-
         from report_by_id import run as run_report_by_id
 
         asyncio.run(run_report_by_id(args.ids))
         return
 
     if args.battery:
-        if not args.ids:
-            parser.error("-battery requires one or more PWRIDs.")
-
         from report_by_id import run_battery_csv
 
         asyncio.run(run_battery_csv(args.ids, args.output or "battery_report.csv"))
         return
 
     if args.fuel:
-        if not args.ids:
-            parser.error("-fuel requires one or more IDs.")
-
         from fuel_tank_report import run as run_fuel_tank_report
 
         asyncio.run(run_fuel_tank_report(args.ids))
         return
 
     if args.coord:
-        if len(args.ids) != 1:
-            parser.error("-coord requires exactly one directory path.")
-
         from coord_from_id import run as run_coord_from_id
 
         run_coord_from_id(args.ids[0], args.output or "sites.csv")

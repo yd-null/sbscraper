@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pdfplumber
 from playwright.async_api import async_playwright
-from sb_config import get_execution_dir, load_credentials
+from sb_config import load_credentials
 from sb_login import LoginError, login_to_sb
 from sb_ui import run_with_spinner, wait_with_spinner
 
@@ -169,7 +169,7 @@ async def _save_pdf_if_report_ready(
 
 async def run(site_ids):
     _configure_playwright_env()
-    output_dir = get_execution_dir() / PDF_OUTPUT_DIR
+    output_dir = Path.cwd() / PDF_OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     username, password = load_credentials()
 

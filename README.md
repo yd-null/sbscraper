@@ -9,7 +9,7 @@
 
 ## Config
 
-On first run, `sbscraper` prompts for your username and password, then creates `config.json` next to the executing program path (`sys.argv[0]` semantics). For `python main.py ...`, this is next to `main.py`; for `sbscraper.exe ...`, this is next to `sbscraper.exe`.
+On first run, `sbscraper` prompts for your username and password, then creates a per-user `config.json`. On Windows this is `%LOCALAPPDATA%\sbscraper\config.json`. Existing credentials stored next to the executable are copied there automatically on the next run.
 
 You can still create/edit it manually if needed. Template:
 
@@ -46,8 +46,16 @@ Run from Command Prompt or PowerShell in the folder containing `sbscraper.exe`:
 .\sbscraper.exe -coord <PDF_DIRECTORY> [--output sites.csv]
 ```
 
+Tagged GitHub releases can also be installed without administrator privileges
+after the package is accepted into the WinGet community repository:
+
+```powershell
+winget install yd-null.sbscraper --scope user
+sbscraper --version
+```
+
 ## Output
 
-- PDF reports are saved under `output/` next to the executing program path (`sys.argv[0]` semantics)
+- PDF reports are saved under `output/` in the current working directory
 - Battery extraction writes CSV to `battery_report.csv` by default (or `--output` path)
 - Coordinate extraction writes CSV to `sites.csv` by default (or `--output` path)

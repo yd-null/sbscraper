@@ -60,16 +60,42 @@ jobs:
           pyinstaller --noconfirm --clean --name sbscraper --collect-data playwright main.py
           Set-Content -Path dist\sbscraper\VERSION -Value $env:APP_VERSION -NoNewline
 
+      - name: Smoke test executable
+        shell: pwsh
+        run: |
+          $versionOutput = & .\dist\sbscraper\sbscraper.exe --version
+          if ($LASTEXITCODE -ne 0 -or $versionOutput -notmatch [regex]::Escape($env:APP_VERSION)) {
+            throw "Unexpected version output: $versionOutput"
+          }
+          & .\dist\sbscraper\sbscraper.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "The packaged executable failed its help smoke test."
+          }
+
       - name: Prepare release assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release -Force | Out-Null
           Copy-Item -Recurse dist\sbscraper release\sbscraper
           Compress-Archive -Path release\sbscraper -DestinationPath release\sbscraper-windows.zip -Force
+          Expand-Archive -Path release\sbscraper-windows.zip -DestinationPath release\archive-test
+          if (-not (Test-Path release\archive-test\sbscraper\sbscraper.exe)) {
+            throw "Release archive does not contain sbscraper\sbscraper.exe."
+          }
+          Remove-Item -Recurse -Force release\archive-test
+
+          $hash = (Get-FileHash release\sbscraper-windows.zip -Algorithm SHA256).Hash
+          "$hash  sbscraper-windows.zip" | Set-Content release\sbscraper-windows.zip.sha256 -Encoding ascii
+          .\.github\scripts\New-WinGetManifests.ps1 `
+            -Version $env:APP_VERSION `
+            -InstallerSha256 $hash `
+            -OutputDirectory release\winget
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release/sbscraper-windows.zip
+            release/sbscraper-windows.zip.sha256
+            release/winget/*.yaml
           generate_release_notes: true

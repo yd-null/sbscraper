@@ -1,17 +1,27 @@
 [build-system]
-requires = ["setuptools>=68", "wheel", "setuptools-scm>=8"]
+requires = ["setuptools>=77", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbscraper"
 dynamic = ["version"]
-description = "Scrape all the things"
+description = "Scrape Structure Builder reports and export related CSV data"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "yd-null" },
+]
 requires-python = ">=3.13"
 dependencies = [
     "pdfplumber>=0.11.7",
     "playwright>=1.53.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yd-null/sbscraper"
+Repository = "https://github.com/yd-null/sbscraper"
+Issues = "https://github.com/yd-null/sbscraper/issues"
 
 [project.optional-dependencies]
 build = [
