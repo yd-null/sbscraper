@@ -21,13 +21,13 @@ that file. A new terminal may be required before the command alias is available.
 
 ## First submission
 
-1. Push the version tag `v1.0.21` and wait for the **Release Windows EXE**
+1. Push the version tag `v1.0.22` and wait for the **Release Windows EXE**
    workflow to succeed.
 2. Download the three `yd-null.sbscraper*.yaml` files from that GitHub Release.
 3. Place them in a fork of `microsoft/winget-pkgs` at:
 
    ```text
-   manifests/y/yd-null/sbscraper/1.0.21/
+   manifests/y/yd-null/sbscraper/1.0.22/
    ```
 
 4. Open a pull request containing only those three manifest files.

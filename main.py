@@ -86,7 +86,8 @@ def main() -> None:
         bool(mode) for mode in (pwrid_mode, args.fuel, args.coord)
     )
     if selected_mode_count == 0:
-        parser.error("You must choose one app flag.")
+        parser.print_help()
+        return
     if selected_mode_count > 1:
         parser.error(
             "--fuel and --coord cannot be combined with --pwrid or --battery."
