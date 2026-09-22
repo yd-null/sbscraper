@@ -44,6 +44,17 @@ def get_config_path() -> Path:
     return get_config_dir() / CONFIG_FILE
 
 
+def get_output_dirs(output_base: str | Path | None = None) -> tuple[Path, Path]:
+    if output_base is not None:
+        base_dir = Path(output_base).expanduser()
+    elif sys.platform == "win32":
+        base_dir = get_config_dir()
+    else:
+        base_dir = Path.cwd()
+
+    return base_dir / "output", base_dir / "csv"
+
+
 def _migrate_legacy_config(config_path: Path) -> None:
     legacy_path = get_execution_dir() / CONFIG_FILE
     if config_path.exists() or not legacy_path.is_file() or legacy_path == config_path:
@@ -56,7 +67,7 @@ def _migrate_legacy_config(config_path: Path) -> None:
 
 def _prompt_and_write_config(config_path: Path) -> bool:
     try:
-        print("Set up credentials for SBScraper.")
+        print("Set up credentials for the Structure Builder scraper.")
         username = input("Username: ").strip()
         password = getpass.getpass("Password: ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -74,6 +85,40 @@ def _prompt_and_write_config(config_path: Path) -> bool:
 
     print(f"Saved credentials to {config_path}.")
     return True
+
+
+def prompt_to_update_password() -> str | None:
+    config_path = get_config_path()
+    print("Login failed. Your Structure Builder password may have expired or been reset.")
+    print(
+        "You may need to sign in to Structure Builder in your web browser "
+        "to reset or change it."
+    )
+
+    try:
+        answer = (
+            input("Update the password saved in config.json? [y/N]: ").strip().lower()
+        )
+        if answer not in {"y", "yes"}:
+            return None
+        password = getpass.getpass("New password: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nPassword update cancelled.")
+        return None
+
+    if not password:
+        print("Password cannot be empty.")
+        return None
+
+    with config_path.open("r", encoding="utf-8") as f:
+        config = json.load(f)
+    config["password"] = password
+    with config_path.open("w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+
+    print(f"Updated the saved password in {config_path}.")
+    return password
 
 
 def load_credentials() -> tuple[str, str]:

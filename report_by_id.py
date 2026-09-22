@@ -16,8 +16,6 @@ from sb_ui import run_with_spinner, wait_with_spinner
 LOGIN_URL = "https://sb.ventia.com.au/"
 SEARCH_URL = "https://sb.ventia.com.au/Search/Search"
 TARGET_URL = "https://sb.ventia.com.au/HierarchyBuilder/LoadHierarchy?OrgCode=ORG01&SiteCode=SITE001&ClientCode=TELSTRA&SystemId=MAIN001&StructureCode="
-PDF_OUTPUT_DIR = "output"
-
 RED = "\033[91m"
 ORANGE = "\033[33m"
 RESET = "\033[0m"
@@ -1118,7 +1116,6 @@ async def run_battery_csv(target_ids, output_csv: str = "battery_report.csv"):
             try:
                 await login_to_sb(page, username, password, LOGIN_URL)
             except LoginError as exc:
-                print(exc)
                 await browser.close()
                 raise SystemExit(1) from exc
 
@@ -1227,14 +1224,20 @@ async def run_battery_csv(target_ids, output_csv: str = "battery_report.csv"):
 
 
 async def run_reports_and_battery_csv(
-    target_ids, output_csv: str = "battery_report.csv"
+    target_ids,
+    output_csv: str = "battery_report.csv",
+    output_dir: str | Path = "output",
 ):
-    await run(target_ids, battery_output_csv=output_csv)
+    await run(target_ids, battery_output_csv=output_csv, output_dir=output_dir)
 
 
-async def run(target_ids, battery_output_csv: str | None = None):
+async def run(
+    target_ids,
+    battery_output_csv: str | None = None,
+    output_dir: str | Path = "output",
+):
     _configure_playwright_env()
-    output_dir = Path.cwd() / PDF_OUTPUT_DIR
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     username, password = load_credentials()
     csv_writer = (
@@ -1257,7 +1260,6 @@ async def run(target_ids, battery_output_csv: str | None = None):
                 try:
                     await login_to_sb(page, username, password, LOGIN_URL)
                 except LoginError as exc:
-                    print(exc)
                     raise SystemExit(1) from exc
 
                 for target_id in target_ids:

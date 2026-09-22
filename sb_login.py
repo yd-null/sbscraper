@@ -1,3 +1,4 @@
+from sb_config import load_credentials, prompt_to_update_password
 from sb_ui import run_with_spinner
 
 
@@ -29,7 +30,7 @@ async def _submit_login_form(page, username: str, password: str) -> None:
     await page.wait_for_load_state("domcontentloaded")
 
 
-async def login_to_sb(page, username: str, password: str, login_url: str) -> None:
+async def _attempt_login(page, username: str, password: str, login_url: str) -> None:
     print("")
     await run_with_spinner("Loading login page", page.goto(login_url))
     await run_with_spinner(
@@ -43,4 +44,28 @@ async def login_to_sb(page, username: str, password: str, login_url: str) -> Non
     await run_with_spinner(
         "Finalizing authenticated session", page.wait_for_load_state("networkidle")
     )
+
+
+async def login_to_sb(page, username: str, password: str, login_url: str) -> None:
+    try:
+        await _attempt_login(page, username, password, login_url)
+    except LoginError as exc:
+        stored_username, stored_password = load_credentials()
+        if stored_username == username and stored_password != password:
+            try:
+                await _attempt_login(page, username, stored_password, login_url)
+            except LoginError as retry_exc:
+                print(retry_exc)
+                raise
+        else:
+            print(exc)
+            updated_password = prompt_to_update_password()
+            if updated_password is None:
+                raise
+            try:
+                await _attempt_login(page, username, updated_password, login_url)
+            except LoginError as retry_exc:
+                print(retry_exc)
+                raise
+
     print(f"{GREEN}Login successful.{RESET}\n")

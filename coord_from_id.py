@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pdfplumber
+from sb_config import get_output_dirs
 
 
 def _path_with_uri(path: str) -> str:
@@ -52,7 +53,9 @@ def run(pdf_folder: str, output_csv: str = "sites.csv") -> None:
 
         rows.append([clean_name, site, lat, lon, file])
 
-    with open(output_csv, "w", newline="", encoding="utf-8") as f:
+    output_path = Path(output_csv)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
             ["Site Name", "Site Address", "Latitude", "Longitude", "Source File"]
@@ -68,13 +71,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("pdf_dir", help="Directory containing PDF files.")
     parser.add_argument(
+        "-o",
         "--output",
-        default="sites.csv",
-        help="CSV output path (default: sites.csv).",
+        metavar="DIRECTORY",
+        default=None,
+        help="Base directory for the csv/ output folder.",
     )
     return parser
 
 
 if __name__ == "__main__":
     args = build_parser().parse_args()
-    run(args.pdf_dir, args.output)
+    _, csv_output_dir = get_output_dirs(args.output)
+    run(args.pdf_dir, str(csv_output_dir / "sites.csv"))

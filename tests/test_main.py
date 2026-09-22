@@ -7,6 +7,26 @@ import main
 
 
 class NoninteractiveCliTests(unittest.TestCase):
+    def test_short_options(self):
+        args = main.build_parser().parse_args(
+            ["-p", "-b", "-o", "reports", "PNGDMG01"]
+        )
+
+        self.assertTrue(args.pwrid)
+        self.assertTrue(args.battery)
+        self.assertEqual(args.output, "reports")
+        self.assertEqual(args.ids, ["PNGDMG01"])
+
+    def test_long_options(self):
+        args = main.build_parser().parse_args(
+            ["--pwrid", "--battery", "--output", "reports", "PNGDMG01"]
+        )
+
+        self.assertTrue(args.pwrid)
+        self.assertTrue(args.battery)
+        self.assertEqual(args.output, "reports")
+        self.assertEqual(args.ids, ["PNGDMG01"])
+
     def test_version_does_not_load_credentials(self):
         with patch.object(main.sys, "argv", ["sbscraper", "--version"]), patch.object(
             main, "ensure_config_ready"
@@ -17,7 +37,7 @@ class NoninteractiveCliTests(unittest.TestCase):
         ensure_config_ready.assert_not_called()
 
     def test_invalid_arguments_do_not_load_credentials(self):
-        with patch.object(main.sys, "argv", ["sbscraper", "-pwrid"]), patch.object(
+        with patch.object(main.sys, "argv", ["sbscraper", "-p"]), patch.object(
             main, "ensure_config_ready"
         ) as ensure_config_ready, contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaisesRegex(SystemExit, "2"):

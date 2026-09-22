@@ -13,8 +13,6 @@ from sb_ui import run_with_spinner, wait_with_spinner
 
 LOGIN_URL = "https://sb.ventia.com.au/"
 TARGET_URL = "https://sb.ventia.com.au/FuelTankRegister/DisplaySiteDetails?siteID="
-PDF_OUTPUT_DIR = "output"
-
 RED = "\033[91m"
 RESET = "\033[0m"
 PAGE_RECHECK_DELAY_MS = 7000
@@ -167,9 +165,9 @@ async def _save_pdf_if_report_ready(
     return True
 
 
-async def run(site_ids):
+async def run(site_ids, output_dir: str | Path = "output"):
     _configure_playwright_env()
-    output_dir = Path.cwd() / PDF_OUTPUT_DIR
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     username, password = load_credentials()
 
@@ -181,7 +179,6 @@ async def run(site_ids):
         try:
             await login_to_sb(page, username, password, LOGIN_URL)
         except LoginError as exc:
-            print(exc)
             await browser.close()
             raise SystemExit(1) from exc
 

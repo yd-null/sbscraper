@@ -25,11 +25,12 @@ That workflow builds a Windows app folder and publishes a GitHub Release with:
 1. Extract `sbscraper-windows.zip` (or download the `sbscraper-windows-onedir` artifact).
 2. Run `sbscraper.exe` from inside the `sbscraper` folder.
 3. On first run, the app prompts for credentials and creates `%LOCALAPPDATA%\sbscraper\config.json`. Existing credentials next to `sbscraper.exe` are migrated automatically.
+4. By default, PDFs are written to `%LOCALAPPDATA%\sbscraper\output` and CSV files to `%LOCALAPPDATA%\sbscraper\csv`.
 
 ## Run examples
 
 ```powershell
-.\sbscraper.exe -pwrid 12345 67890
-.\sbscraper.exe -fuel 1001 1002
-.\sbscraper.exe -coord .\pdfs --output sites.csv
+.\sbscraper.exe -p 12345 67890
+.\sbscraper.exe -f 1001 1002
+.\sbscraper.exe -c .\pdfs -o C:\Reports
 ```
